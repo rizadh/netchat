@@ -48,7 +48,7 @@ void parseargs(int argc, char **argv) {
     if (argc == 2) {
         listen_port = atoi(argv[1]);
     } else if (argc > 2) {
-        fprintf(stderr, "usage: %s [-p LISTEN_PORT]\n", argv[0]);
+        fprintf(stderr, "usage: %s [PORT]\n", argv[0]);
     }
 }
 
