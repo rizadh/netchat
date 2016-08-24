@@ -29,7 +29,7 @@ void handle_users();
 void add_user(int fd);
 void read_user(struct user *p);
 void process_user(struct user *p, int msglen);
-void declare_user(struct user *newuser);
+void declare_user(struct user *p);
 void disconnect_user(struct user *p);
 char *memnewline(char *p, int size);
 
@@ -125,7 +125,7 @@ void add_user(int fd) {
     userlist = newuser;
 }
 
-void declare_user(struct user *newuser) {
+void declare_user(struct user *p) {
     // TODO
 }
 
