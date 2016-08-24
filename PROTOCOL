@@ -1,0 +1,18 @@
+Upon connection, server sends a line, "NETCHAT" followed by the protocol version number on a seperate line.
+
+Server provides list of all users in history, then provides a list of messages (format described below)
+
+Client can send server a message by simply sending the message string.
+
+
+Protocol Format:
+
+Server -> Client
+
+netchat PROTOCOL - send protocol number to client
+user ID HANDLE - notify client of a user
+message ID CONTENT - notify client of a message
+
+Client -> Server
+
+MESSAGE - send a chat message from the client
