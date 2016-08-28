@@ -2,24 +2,25 @@
 #include <sys/socket.h>
 #include <netinet/in.h>
 #include <string.h>
+#include <unistd.h>
 #include <stdlib.h>
 #include <sys/select.h>
-#include <unistd.h>
 #include <sys/types.h>
 #include <sys/uio.h>
+#include "util.h"
 
 struct user {
     int fd;
     int id;
-    char handle[20];
-    char buf[80];
+    char handle[MAX_HANDLE];
+    char buf[MAX_LEN];
     int num_bytes;
     struct user *next;
 } *userlist = NULL;
 
 struct message {
     struct user *author;
-    char text[80];
+    char text[MAX_LEN];
     struct message *next;
 } *messagelist = NULL;
 
@@ -30,15 +31,23 @@ void add_user(int fd);
 void read_user(struct user *p);
 void process_user(struct user *p, int msglen);
 void declare_user(struct user *p);
+void update_user(struct user *p);
 void disconnect_user(struct user *p);
-char *memnewline(char *p, int size);
+void handle_message(struct user *p, char *msg);
+void add_message(struct user *p, char *msg);
+void set_handle(struct user *p, char *msg);
+void send_to_all(char *msg, struct user *exception);
+char *get_user_declaration(struct user *p);
+int USER_ISLIVE(struct user *p);
 
 int socket_fd;
 int listen_port = DEFAULT_PORT;
+char protocol_string[MAX_LEN];
 
 int main(int argc, char **argv) {
     parseargs(argc, argv);
     create_socket();
+    sprintf(protocol_string, "netchat %d", PROTOCOL_VERSION);
     while (1) {
         handle_users();
     }
@@ -84,11 +93,8 @@ void handle_users() {
     FD_ZERO(&fdlist);
     FD_SET(socket_fd, &fdlist);
     for (curr_user = userlist; curr_user; curr_user = curr_user->next) {
-        if (curr_user->fd == -1) continue;
-        FD_SET(curr_user->fd, &fdlist);
-        if (curr_user->fd > maxfd) {
-            maxfd = curr_user->fd;
-        }
+        if (curr_user->fd > 0) FD_SET(curr_user->fd, &fdlist);
+        if (curr_user->fd > maxfd) maxfd = curr_user->fd;
     }
 
     if (select(maxfd+1, &fdlist, NULL, NULL, NULL) < 0) {
@@ -106,7 +112,7 @@ void handle_users() {
         }
         add_user(newfd);
     } else for (curr_user = userlist; curr_user; curr_user = curr_user->next) {
-        if (FD_ISSET(curr_user->fd, &fdlist)) {
+        if (curr_user->fd > 0 && FD_ISSET(curr_user->fd, &fdlist)) {
             read_user(curr_user);
             return;
         }
@@ -123,10 +129,49 @@ void add_user(int fd) {
     newuser->num_bytes = 0;
     newuser->next = userlist;
     userlist = newuser;
+
+    send_string(fd, protocol_string);
+    printf("User %d connected at fd %d\n", newuser->id, newuser->fd);
 }
 
 void declare_user(struct user *p) {
-    // TODO
+    char *declaration = get_user_declaration(p);
+
+    send_to_all(declaration, p);
+
+    free(declaration);
+}
+
+void update_user(struct user *p) {
+    struct user *curruser;
+    struct message *currmsg;
+    char *str;
+
+    for (curruser = userlist; curruser; curruser = curruser->next) {
+        if (curruser->handle[0] != '\0' && curruser != p) {
+            asprintf(&str, "user %d %s", curruser->id, curruser->handle);
+            send_string(p->fd, str);
+        }
+    }
+
+    for (currmsg = messagelist; currmsg; currmsg = currmsg->next) {
+        asprintf(&str, "said %d %s", currmsg->author->id, currmsg->text);
+        send_string(p->fd, str);
+    }
+}
+
+void send_to_all(char *msg, struct user *exception) {
+    struct user *p;
+    for (p = userlist; p; p = p->next)
+        if (USER_ISLIVE(p) && exception != p)
+            send_string(p->fd, msg);
+}
+
+char *get_user_declaration(struct user *p) {
+    char *str;
+    asprintf(&str, "user %d %s", p->id, p->handle);
+
+    return str;
 }
 
 void read_user(struct user *p) {
@@ -146,25 +191,92 @@ void read_user(struct user *p) {
         char *q;
         p->num_bytes += len;
 
-        if ((q = memnewline(p->buf, p->num_bytes))) {
+        while ((q = memnewline(p->buf, p->num_bytes))) {
             process_user(p, q - p->buf);
         }
     }
 }
 
-char *memnewline(char *p, int size) {
-    for (; size > 0; size--, p++)
-        if (*p == '\r' || *p == '\n') return(p);
-    return(NULL);
+void process_user(struct user *p, int msglen) {
+    char *rxmsg = malloc(msglen + 1);
+    memcpy(rxmsg, p->buf, msglen);
+    rxmsg[msglen] = '\0';
+
+    p->num_bytes -= msglen;
+    char *cursor;
+    for (cursor = p->buf + msglen; p->num_bytes > 0 && (*cursor == '\r' ||
+            *cursor == '\n'); cursor++)
+        p->num_bytes--;
+
+    memcpy(p->buf, cursor, p->num_bytes);
+
+    handle_message(p, rxmsg);
 }
 
-void process_user(struct user *p, int msglen) {
-    // Temporarily output to stdout
-    write(1, p->buf, msglen);
-    write(1, "\n", 1);
+void handle_message(struct user *p, char *msg) {
+    if (!valid_string(msg)) {
+        fprintf(stderr, "Illegal characters in message: user %d\n", p->id);
+        disconnect_user(p);
+        return;
+    }
+
+    if (p->handle[0] == '\0')
+        set_handle(p, msg);
+    else
+        add_message(p, msg);
+
+    free(msg);
+}
+
+void set_handle(struct user *p, char *msg) {
+    int len;
+    if ((len = strlen(msg)) > MAX_HANDLE) {
+        fprintf(stderr, "Handle too long: user %d\n", p->id);
+        return;
+    }
+
+    memcpy(p->handle, msg, len);
+    p->handle[len] = '\0';
+
+    update_user(p);
+    declare_user(p);
+
+    printf("User %d handle was set to %s\n", p->id, p->handle);
+}
+
+int USER_ISLIVE(struct user *p) {
+    return p->fd > 0 && p->handle[0] != '\0';
+}
+
+void add_message(struct user *p, char *msg) {
+    char *str;
+
+    struct message *newmsg = malloc(sizeof (struct message));
+    newmsg->author = p;
+    newmsg->next = NULL;
+    memcpy(newmsg->text, msg, strlen(msg) + 1);
+    struct message **pp;
+    for (pp = &messagelist; *pp; pp = &(*pp)->next) ;
+
+    *pp = newmsg;
+
+
+    asprintf(&str, "said %d %s", p->id, msg);
+
+    send_to_all(str, p);
+
+    free(str);
+
+    printf("User %d said %s\n", p->id, msg);
 }
 
 void disconnect_user(struct user *p) {
-    close(p->fd);
+    if (p->fd != -1) {
+        close(p->fd);
+        printf("User %d was disconnected\n", p->id);
+    } else 
+        fprintf(stderr, "Tried to disconnect already disconnected user %d\n",
+                p->id);
+
     p->fd = -1;
 }
