@@ -15,6 +15,7 @@ struct user {
     char handle[MAX_HANDLE];
     char buf[MAX_LEN];
     int num_bytes;
+    int buffer_overflowed;
     struct user *next;
 } *userlist = NULL;
 
@@ -183,7 +184,8 @@ void read_user(struct user *p) {
         exit(1);
     } else if (len == 0) {
         if (p->num_bytes == sizeof p->buf) {
-            process_user(p, p->num_bytes);
+            p->num_bytes = 0;
+            p->buffer_overflowed = 1;
         } else {
             disconnect_user(p);
         }
@@ -210,7 +212,13 @@ void process_user(struct user *p, int msglen) {
 
     memcpy(p->buf, cursor, p->num_bytes);
 
-    handle_message(p, rxmsg);
+    if (p->buffer_overflowed) {
+        p->buffer_overflowed = 0;
+        fprintf(stderr, "User %d sent too long a message, was ignored\n",
+                p->id);
+    } else {
+        handle_message(p, rxmsg);
+    }
 }
 
 void handle_message(struct user *p, char *msg) {
