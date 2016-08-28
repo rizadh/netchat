@@ -55,11 +55,10 @@ int main(int argc, char **argv) {
 }
 
 void parseargs(int argc, char **argv) {
-    if (argc == 2) {
+    if (argc == 2)
         listen_port = atoi(argv[1]);
-    } else if (argc > 2) {
+    else if (argc > 2)
         fprintf(stderr, "usage: %s [PORT]\n", argv[0]);
-    }
 }
 
 void create_socket() {
@@ -94,8 +93,10 @@ void handle_users() {
     FD_ZERO(&fdlist);
     FD_SET(socket_fd, &fdlist);
     for (curr_user = userlist; curr_user; curr_user = curr_user->next) {
-        if (curr_user->fd > 0) FD_SET(curr_user->fd, &fdlist);
-        if (curr_user->fd > maxfd) maxfd = curr_user->fd;
+        if (curr_user->fd > 0)
+            FD_SET(curr_user->fd, &fdlist);
+        if (curr_user->fd > maxfd)
+            maxfd = curr_user->fd;
     }
 
     if (select(maxfd+1, &fdlist, NULL, NULL, NULL) < 0) {
@@ -193,9 +194,8 @@ void read_user(struct user *p) {
         char *q;
         p->num_bytes += len;
 
-        while ((q = memnewline(p->buf, p->num_bytes))) {
+        while ((q = memnewline(p->buf, p->num_bytes)))
             process_user(p, q - p->buf);
-        }
     }
 }
 
@@ -223,7 +223,7 @@ void process_user(struct user *p, int msglen) {
 
 void handle_message(struct user *p, char *msg) {
     if (!valid_string(msg)) {
-        fprintf(stderr, "Illegal characters in message: user %d\n", p->id);
+        fprintf(stderr, "User %d sent an illegal character\n", p->id);
         disconnect_user(p);
         return;
     }
