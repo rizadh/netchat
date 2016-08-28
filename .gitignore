@@ -2,4 +2,5 @@ server
 client
 *.o
 *.swp
+*.dSYM
 .vscode
