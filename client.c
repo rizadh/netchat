@@ -11,7 +11,7 @@ typedef struct user {
 typedef struct server {
     int fd;
     int port;
-    char *address;
+    char *hostname;
     char buf[MAX_LEN];
     int num_bytes;
 } Server;
@@ -22,7 +22,7 @@ void handle_input();
 
 Server server = {
     .port = DEFAULT_PORT,
-    .address = NULL,
+    .hostname = NULL,
     .num_bytes = 0
 };
 
@@ -40,14 +40,14 @@ void parseargs(int argc, char **argv) {
         case 3:
             server.port = atoi(argv[2]);
         case 2:
-            server.address = argv[1];
+            server.hostname = argv[1];
         case 1:
             break;
         default:
-            fprintf(stderr, "usage: %s [SERVER_ADDRESS [PORT]]", argv[0]);
+            fprintf(stderr, "usage: %s [HOSTNAME [PORT]]", argv[0]);
     }
 
-    printf("Server address is %s\n", server.address);
+    printf("Server hostname is %s\n", server.hostname);
     printf("Server post is %d\n", server.port);
 }
 
