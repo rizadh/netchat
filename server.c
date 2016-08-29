@@ -60,6 +60,7 @@ void parseargs(int argc, char **argv) {
         listen_port = atoi(argv[1]);
     else if (argc > 2)
         fprintf(stderr, "usage: %s [PORT]\n", argv[0]);
+        exit(1);
 }
 
 void create_socket() {
