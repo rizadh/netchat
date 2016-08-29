@@ -1,4 +1,4 @@
-CFLAGS=-Wall -DPROTOCOL_VERSION=1 -DMAX_HANDLE=20 -DMAX_LEN=80 -DDEFAULT_PORT=1024 -ggdb
+CFLAGS=-Wall -ggdb
 
 all: server client
 

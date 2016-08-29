@@ -8,6 +8,7 @@
 #include <sys/types.h>
 #include <sys/uio.h>
 #include "util.h"
+#include "macros.h"
 
 struct user {
     int fd;

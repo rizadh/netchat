@@ -1,4 +1,5 @@
 #include <stdio.h>
+#include "macros.h"
 
 typedef struct user {
     int id;
