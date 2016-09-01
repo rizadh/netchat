@@ -58,9 +58,10 @@ int main(int argc, char **argv) {
 void parseargs(int argc, char **argv) {
     if (argc == 2)
         listen_port = atoi(argv[1]);
-    else if (argc > 2)
+    else if (argc > 2) {
         fprintf(stderr, "usage: %s [PORT]\n", argv[0]);
         exit(1);
+    }
 }
 
 void create_socket() {
