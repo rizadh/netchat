@@ -3,6 +3,7 @@
 #include <unistd.h>
 #include <string.h>
 #include "util.h"
+#include "macros.h"
 
 char *memnewline(char *p, int size) {
     for (; size > 0; size--, p++)
