@@ -120,12 +120,13 @@ void handle_input() {
 }
 
 void process_server(int msglen) {
-    printf("Server said \"%s\"\n", extract_message(server.buf,
-                &server.num_bytes, msglen));
+    char *message = extract_message(server.buf, &server.num_bytes, msglen);
+    printf("%s\n", message);
 }
 
 void process_user(int msglen) {
-    printf("User said \"%s\"\n", extract_message(buf, &num_bytes, msglen));
+    char *message = extract_message(buf, &num_bytes, msglen);
+    send_string(server.fd, message);
 }
 
 void read_from(int fd, char *buf, int buf_size, int *num_bytes,
@@ -137,7 +138,7 @@ void read_from(int fd, char *buf, int buf_size, int *num_bytes,
             perror("read");
             exit(1);
         case 0:
-            fprintf(stderr, "Message too long");
+            fprintf(stderr, "Message too long or connection closed\n");
             exit(1);
         default:
             *num_bytes += len;
