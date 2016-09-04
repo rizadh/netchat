@@ -36,6 +36,7 @@ int num_bytes;
 
 void parseargs(int argc, char **argv);
 void connect_server();
+void print_handle_prompt();
 void handle_input();
 void read_from(int fd, char *buf, int buf_size, int *num_bytes,
         void (*process)(int msglen));
@@ -54,6 +55,7 @@ User *userlist = NULL;
 int main(int argc, char **argv) {
     parseargs(argc, argv);
     connect_server();
+    print_handle_prompt();
     while (1)
         handle_input();
 }
@@ -98,6 +100,11 @@ void connect_server() {
     }
 }
 
+void print_handle_prompt() {
+    printf("Enter your handle: ");
+    fflush(stdout);
+}
+
 void handle_input() {
     fd_set fdlist;
     int maxfd = server.fd;
@@ -121,12 +128,13 @@ void handle_input() {
 
 void process_server(int msglen) {
     char *message = extract_message(server.buf, &server.num_bytes, msglen);
-    printf("%s\n", message);
 }
 
 void process_user(int msglen) {
     char *message = extract_message(buf, &num_bytes, msglen);
     send_string(server.fd, message);
+    printf("Enter a message: ");
+    fflush(stdout);
 }
 
 void read_from(int fd, char *buf, int buf_size, int *num_bytes,
