@@ -32,15 +32,15 @@ typedef struct server {
 } Server;
 
 char buf[MAX_LEN];
-char num_bytes;
+int num_bytes;
 
 void parseargs(int argc, char **argv);
 void connect_server();
 void handle_input();
-void read_user();
-void read_server();
+void read_from(int fd, char *buf, int buf_size, int *num_bytes, void (*process)(int msglen));
 void process_user(int msglen);
 void process_server(int msglen);
+char *extract_message(char *buf, int *num_bytes_pointer, int msglen);
 
 Server server = {
     .port = DEFAULT_PORT,
@@ -110,54 +110,23 @@ void handle_input() {
         exit(1);
     }
 
-    if (FD_ISSET(server.fd, &fdlist)) {
-        read_server();
-    }
+    if (FD_ISSET(server.fd, &fdlist))
+        read_from(server.fd, server.buf, sizeof server.buf, &server.num_bytes, process_server);
 
-    if (FD_ISSET(0, &fdlist)) {
-        read_user();
-    }
-}
-
-void read_server() {
-    socklen_t len = read(server.fd, server.buf + server.num_bytes,
-            sizeof server.buf - server.num_bytes);
-
-    switch (len) {
-        case -1:
-            perror("read");
-            exit(1);
-        case 0:
-            fprintf(stderr,
-                    "Server closed connection or sent too long a message\n");
-            exit(1);
-        default:
-            server.num_bytes += len;
-            char *q;
-
-            while ((q = memnewline(server.buf, server.num_bytes)))
-                process_server(q - server.buf);
-    }
+    if (FD_ISSET(0, &fdlist))
+        read_from(0, buf, sizeof buf, &num_bytes, process_user);
 }
 
 void process_server(int msglen) {
-    char *rxmsg = malloc(msglen + 1);
-    memcpy(rxmsg, server.buf, msglen);
-    rxmsg[msglen] = '\0';
-
-    server.num_bytes -= msglen;
-    char *cursor;
-    for (cursor = server.buf + msglen; server.num_bytes > 0 && (*cursor == '\r' ||
-            *cursor == '\n'); cursor++)
-        server.num_bytes--;
-
-    memcpy(server.buf, cursor, server.num_bytes);
-
-    printf("Server said \"%s\"\n", rxmsg);
+    printf("Server said \"%s\"\n", extract_message(server.buf, &server.num_bytes, msglen));
 }
 
-void read_user() {
-    socklen_t len = read(0, buf + num_bytes, sizeof buf - num_bytes);
+void process_user(int msglen) {
+    printf("User said \"%s\"\n", extract_message(buf, &num_bytes, msglen));
+}
+
+void read_from(int fd, char *buf, int buf_size, int *num_bytes, void (*process)(int msglen)) {
+    socklen_t len = read(fd, buf + *num_bytes, buf_size - *num_bytes);
 
     switch (len) {
         case -1:
@@ -167,26 +136,25 @@ void read_user() {
             fprintf(stderr, "Message too long");
             exit(1);
         default:
-            num_bytes += len;
+            *num_bytes += len;
             char *q;
 
-            while ((q = memnewline(buf, num_bytes)))
-                process_user(q - buf);
+            while ((q = memnewline(buf, *num_bytes)))
+                process(q - buf);
     }
 }
 
-void process_user(int msglen) {
-    char *rxmsg = malloc(msglen + 1);
-    memcpy(rxmsg, buf, msglen);
-    rxmsg[msglen] = '\0';
+char *extract_message(char *buf, int *num_bytes, int msglen) {
+    char *msg = malloc(msglen + 1);
+    memcpy(msg, buf, msglen);
+    msg[msglen] = '\0';
 
-    num_bytes -= msglen;
+    *num_bytes -= msglen;
     char *cursor;
-    for (cursor = buf + msglen; num_bytes > 0 && (*cursor == '\r' ||
-            *cursor == '\n'); cursor++)
-        num_bytes--;
+    for (cursor = buf + msglen; *num_bytes > 0 && memnewline(cursor, 1) == cursor; cursor++)
+        (*num_bytes)--;
 
-    memcpy(buf, cursor, num_bytes);
+    memcpy(buf, cursor, *num_bytes);
 
-    printf("Server said \"%s\"\n", rxmsg);
+    return msg;
 }
