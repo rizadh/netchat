@@ -37,7 +37,8 @@ int num_bytes;
 void parseargs(int argc, char **argv);
 void connect_server();
 void handle_input();
-void read_from(int fd, char *buf, int buf_size, int *num_bytes, void (*process)(int msglen));
+void read_from(int fd, char *buf, int buf_size, int *num_bytes,
+        void (*process)(int msglen));
 void process_user(int msglen);
 void process_server(int msglen);
 char *extract_message(char *buf, int *num_bytes_pointer, int msglen);
@@ -111,21 +112,24 @@ void handle_input() {
     }
 
     if (FD_ISSET(server.fd, &fdlist))
-        read_from(server.fd, server.buf, sizeof server.buf, &server.num_bytes, process_server);
+        read_from(server.fd, server.buf, sizeof server.buf, &server.num_bytes,
+                process_server);
 
     if (FD_ISSET(0, &fdlist))
         read_from(0, buf, sizeof buf, &num_bytes, process_user);
 }
 
 void process_server(int msglen) {
-    printf("Server said \"%s\"\n", extract_message(server.buf, &server.num_bytes, msglen));
+    printf("Server said \"%s\"\n", extract_message(server.buf,
+                &server.num_bytes, msglen));
 }
 
 void process_user(int msglen) {
     printf("User said \"%s\"\n", extract_message(buf, &num_bytes, msglen));
 }
 
-void read_from(int fd, char *buf, int buf_size, int *num_bytes, void (*process)(int msglen)) {
+void read_from(int fd, char *buf, int buf_size, int *num_bytes,
+        void (*process)(int msglen)) {
     socklen_t len = read(fd, buf + *num_bytes, buf_size - *num_bytes);
 
     switch (len) {
@@ -151,7 +155,8 @@ char *extract_message(char *buf, int *num_bytes, int msglen) {
 
     *num_bytes -= msglen;
     char *cursor;
-    for (cursor = buf + msglen; *num_bytes > 0 && memnewline(cursor, 1) == cursor; cursor++)
+    for (cursor = buf + msglen; *num_bytes > 0 &&
+            memnewline(cursor, *num_bytes) == cursor; cursor++)
         (*num_bytes)--;
 
     memcpy(buf, cursor, *num_bytes);
